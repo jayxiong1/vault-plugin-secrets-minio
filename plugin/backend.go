@@ -3,6 +3,7 @@ package minio
 import (
     "context"
     "sync"
+    "strings"
 
     "github.com/hashicorp/vault/sdk/logical"
     "github.com/hashicorp/vault/sdk/framework"
@@ -25,7 +26,7 @@ type backend struct {
 func Factory(ctx context.Context, c *logical.BackendConfig) (logical.Backend, error) {
     b := Backend()
     if err := b.Setup(ctx, c); err != nil {
-	return nil, err
+    return nil, err
     }
 
     b.Logger().Info("Plugin successfully initialized")
@@ -37,31 +38,41 @@ func Backend() *backend {
     var b backend
 
     b.Backend = &framework.Backend{
-	BackendType: logical.TypeLogical,
-	Help: "The minio secrets backend provisions users on a Minio server",
+    BackendType: logical.TypeLogical,
+    Help: strings.TrimSpace(minioHelp),
+    PathsSpecial: &logical.Paths{
+        SealWrapStorage: []string{
+            "config",
+            "roles/*",
+            "users",
+        },
+    },
+    Paths: []*framework.Path{
+        // path_config.go
+        // ^config
+        b.pathConfigCRUD(),
 
-	Paths: []*framework.Path{
-	    // path_config.go
-	    // ^config
-	    b.pathConfigCRUD(),
+        // path_roles.go
+        // ^roles (LIST)
+        b.pathRoles(),
+        // ^roles/<role> 
+        b.pathRolesCRUD(),
 
-	    // path_roles.go
-	    // ^roles (LIST)
-	    b.pathRoles(),
-	    // ^roles/<role> 
-	    b.pathRolesCRUD(),
+        // path_keys.go
+        // ^keys/<role>
+        b.pathKeysRead(),
+    },
 
-	    // path_keys.go
-	    // ^keys/<role>
-	    b.pathKeysRead(),
-	},
-
-	Secrets: []*framework.Secret{
-	    b.minioAccessKeys(),
-	},
+    Secrets: []*framework.Secret{
+        b.minioAccessKeys(),
+    },
     }
 
     b.client = (*madmin.AdminClient)(nil)
 
     return &b
 }
+
+const minioHelp = `
+The minio secret backend returns minio static credential stored in vault or return dynamic STS credentials to access data on Minio server.
+`
