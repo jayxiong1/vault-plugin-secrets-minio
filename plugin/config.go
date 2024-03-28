@@ -5,8 +5,8 @@ import (
     "strings"
 
     "github.com/hashicorp/errwrap"
-    "github.com/hashicorp/vault/logical"
-    "github.com/hashicorp/vault/logical/framework"
+    "github.com/hashicorp/vault/sdk/logical"
+    "github.com/hashicorp/vault/sdk/framework"
 )
 
 // The stored plugin configuration

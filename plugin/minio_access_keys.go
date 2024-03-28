@@ -4,11 +4,11 @@ import (
     "context"
     "fmt"
 
-    "github.com/hashicorp/vault/logical"
-    "github.com/hashicorp/vault/logical/framework"
-    "github.com/hashicorp/vault/helper/base62"
+    "github.com/hashicorp/vault/sdk/logical"
+    "github.com/hashicorp/vault/sdk/framework"
+    "github.com/hashicorp/vault/sdk/helper/base62"
 
-    "github.com/minio/minio/pkg/madmin"
+    "github.com/minio/madmin-go/v3"
 )
 
 const minioKeyType = "minio_access_key"
@@ -57,7 +57,7 @@ func (b *backend) minioAccessKeyCreate(ctx context.Context, s logical.Storage,
 	return nil, err
     }
 
-    err = client.AddUser(accessKeyId, secretAccessKey)
+    err = client.AddUser(ctx, accessKeyId, secretAccessKey)
     if err != nil {
 	b.Logger().Error("Adding minio user failed", "accessKeyId", accessKeyId,
 	    "error", err)
@@ -66,7 +66,7 @@ func (b *backend) minioAccessKeyCreate(ctx context.Context, s logical.Storage,
 
     b.Logger().Info("Adding policy to minio user", "accessKeyId", accessKeyId,
 	"policy", policy)
-    err = client.SetUserPolicy(accessKeyId, policy)
+    err = client.SetPolicy(ctx, policy, accessKeyId, false)
     if err != nil {
 	b.Logger().Error("Setting minio user policy failed", "accessKeyId", accessKeyId,
 	    "policy", policy, "error", err)
@@ -79,7 +79,7 @@ func (b *backend) minioAccessKeyCreate(ctx context.Context, s logical.Storage,
 	PolicyName: policy,
 	Status: madmin.AccountEnabled,
     }
-    
+
     return newUser, nil
 }
 
@@ -105,7 +105,7 @@ func (b *backend) minioAccessKeyRevoke(ctx context.Context, req *logical.Request
 
     b.Logger().Info("Revoking access key", "accessKeyId", accessKeyId)
 
-    if err = client.RemoveUser(accessKeyId); err != nil {
+    if err = client.RemoveUser(ctx, accessKeyId); err != nil {
 	return nil, err
     }
 

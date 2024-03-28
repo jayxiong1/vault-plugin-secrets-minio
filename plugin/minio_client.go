@@ -4,9 +4,9 @@ import (
     "context"
     "errors"
 
-    "github.com/hashicorp/vault/logical"
+    "github.com/hashicorp/vault/sdk/logical"
 
-    "github.com/minio/minio/pkg/madmin"
+    "github.com/minio/madmin-go/v3"
 )
 
 // Convenience function to get a new madmin client
