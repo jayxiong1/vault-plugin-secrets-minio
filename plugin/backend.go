@@ -26,7 +26,7 @@ type backend struct {
 func Factory(ctx context.Context, c *logical.BackendConfig) (logical.Backend, error) {
     b := Backend()
     if err := b.Setup(ctx, c); err != nil {
-    return nil, err
+        return nil, err
     }
 
     b.Logger().Info("Plugin successfully initialized")
