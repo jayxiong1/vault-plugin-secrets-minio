@@ -11,7 +11,7 @@ import (
     "github.com/minio/madmin-go/v3"
 )
 
-type backend struct {
+type minioBackend struct {
     *framework.Backend
 
     client *madmin.AdminClient
@@ -34,8 +34,8 @@ func Factory(ctx context.Context, c *logical.BackendConfig) (logical.Backend, er
 }
 
 // Backend returns a configured minio backend
-func Backend() *backend {
-    var b backend
+func Backend() *minioBackend {
+    var b minioBackend
 
     b.Backend = &framework.Backend{
     BackendType: logical.TypeLogical,
@@ -61,10 +61,6 @@ func Backend() *backend {
         // path_keys.go
         // ^keys/<role>
         b.pathKeysRead(),
-    },
-
-    Secrets: []*framework.Secret{
-        b.minioAccessKeys(),
     },
     }
 
