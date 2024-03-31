@@ -6,73 +6,131 @@ import (
     "time"
 
     "github.com/hashicorp/errwrap"
-    "github.com/hashicorp/vault/sdk/logical"
     "github.com/hashicorp/vault/sdk/framework"
+    "github.com/hashicorp/vault/sdk/logical"
 )
 
-// Define the R functions for the keys path
-func (b *backend) pathKeysRead() *framework.Path {
+func (b *minioBackend) pathKeysRead() *framework.Path {
     return &framework.Path{
-	Pattern: fmt.Sprintf("keys/" + framework.GenericNameRegex("role")),
-	HelpSynopsis: "Provision a key for this role.",
+        Pattern:      fmt.Sprintf("creds/" + framework.GenericNameRegex("role")),
+        HelpSynopsis: "Provision a key for this role.",
 
-	Fields: map[string]*framework.FieldSchema{
-	    "role": &framework.FieldSchema{
-		Type: framework.TypeString,
-		Description: "Name of role.",
-	    },
-	    "ttl": &framework.FieldSchema{
-		Type: framework.TypeDurationSecond,
-		Description: "Lifetime of accessKey in seconds.",
-	    },
-	},
+        Fields: map[string]*framework.FieldSchema{
+            "role": &framework.FieldSchema{
+                Type:        framework.TypeString,
+                Description: "Name of role.",
+            },
+            "policy": &framework.FieldSchema{
+                Type:        framework.TypeString,
+                Description: "Policy in JSON format",
+            },
+            "sts_ttl": &framework.FieldSchema{
+                Type:        framework.TypeDurationSecond,
+                Description: "Lifetime of accessKey in seconds.",
+            },
+            "sts": &framework.FieldSchema{
+                Type: framework.TypeBool,
+                Default: false,
+                Description: "Flag to verify if the application needs sts or user static credentials.",
+            },
+        },
 
-	Callbacks: map[logical.Operation]framework.OperationFunc{
-	    logical.ReadOperation: b.pathKeyRead,
-	},
+        Operations: map[logical.Operation]framework.OperationHandler{
+            logical.UpdateOperation: &framework.PathOperation{
+                Callback: b.pathKeysCreate,
+            },
+            logical.DeleteOperation: &framework.PathOperation{
+                Callback: b.pathKeysRevoke,
+            },
+        },
     }
 }
 
-
-// Read a new key
-func (b *backend) pathKeyRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-
+func (b *minioBackend) pathKeysCreate(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+    var resp map[string]interface{}
     roleName := d.Get("role").(string)
+    sts := d.Get("sts").(bool)
 
     role, err := b.GetRole(ctx, req.Storage, roleName)
     if err != nil {
-	return nil, errwrap.Wrapf("error fetching role: {{err}}", err)
+        return nil, errwrap.Wrapf("error fetching role: {{err}}", err)
     }
 
-    newKeyName := fmt.Sprintf("%s%s", role.UserNamePrefix, req.ID)
-
-    // Calculate lifetime
-    reqTTL := time.Duration(d.Get("ttl").(int)) * time.Second
-    ttl, _, err := framework.CalculateTTL(b.System(), 0, role.DefaultTTL, reqTTL, role.MaxTTL, 0, time.Time{})
+    userCreds, err := b.getUserCredential(ctx, req, roleName, role)
     if err != nil {
-	return nil, err
+        return nil, err
     }
 
-    // Generate new accessKey
-    newKey, err := b.minioAccessKeyCreate(ctx, req.Storage, newKeyName, role.Policy)
+    if sts {
+        var sts_ttl time.Duration
+        ttl := time.Duration(d.Get("sts_ttl").(int)) * time.Second
+
+        if ttl == 0 {
+            sts_ttl = role.StsMaxTTL
+        } else {
+            sts_ttl = ttl
+        }
+
+        policy := d.Get("policy").(string)
+
+        newKey, err := b.getSTS(ctx, req, userCreds, policy, sts_ttl)
+        if err != nil {
+            return nil, err
+        }
+
+        // Gin up response
+        resp = map[string]interface{}{
+            "accessKeyId":     newKey.AccessKeyID,
+            "secretAccessKey": newKey.SecretAccessKey,
+            "ttl":             sts_ttl.Seconds(),
+        }
+    } else {
+        // Gin up response
+        resp = map[string]interface{}{
+            "accessKeyId":     userCreds.AccessKeyID,
+            "secretAccessKey": userCreds.SecretAccessKey,
+            "policy_name":     role.PolicyName,
+            "ttl":             0,
+            "userAccountStatus": userCreds.Status,
+        }
+    }
+
+    return &logical.Response{
+        Data: resp,
+    }, nil
+}
+
+func (b *minioBackend) pathKeysRevoke(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+    role := d.Get("role").(string)
+    err := b.removeUser(ctx, req, role)
+
     if err != nil {
-	return nil, err
+        return nil, err
     }
 
-    // Gin up response
-    resp := b.Secret(minioKeyType).Response(map[string]interface{}{
-	// Returned secret
-	"accessKeyId": newKeyName,
-	"secretAccessKey": newKey.SecretKey,
-	"accountStatus": newKey.Status,
-	"policy": newKey.PolicyName,
-    }, map[string]interface{}{
-	// Internal Data
-	"accessKeyId": newKeyName,
-    })
+    return nil, nil
+}
 
-    resp.Secret.TTL = ttl
-    resp.Secret.MaxTTL = role.MaxTTL
+func (b *minioBackend) getUserCredential(ctx context.Context, req *logical.Request, roleName string, role *Role) (*UserInfo, error) {
+    // Getting user details from vault
+    userInfo, err := b.getUserInfo(ctx, req.Storage, roleName)
+    if err != nil {
+        return nil, err
+    }
 
-    return resp, nil
+    if userInfo == nil {
+        var newKeyName string
+        if role.UserNamePrefix == "" {
+            newKeyName = fmt.Sprintf("%s", req.ID)
+        } else {
+            newKeyName = fmt.Sprintf("%s-%s", role.UserNamePrefix, req.ID)
+        }
+
+        // if user is not present in vault create new and add user to vault
+        userInfo, err = b.addUser(ctx, req, newKeyName, role.PolicyName, roleName)
+        if err != nil {
+            return nil, err
+        }
+    }
+    return userInfo, nil
 }
