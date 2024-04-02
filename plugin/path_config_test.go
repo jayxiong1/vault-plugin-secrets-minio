@@ -11,7 +11,7 @@ import (
 )
 
 const (
-    TEST_APP_OSS_ENDPOINT          = "oss-test.intralinks.com"
+    TEST_APP_OSS_ENDPOINT          = "oss-test.com"
     TEST_APP_OSS_ACCESS_KEY_ID     = "test-access-key-id"
     TEST_APP_OSS_SECRET_ACCESS_KEY = "test-secret-access-key"
     TEST_OSS_ENDPOINT_USE_SSL      = true
