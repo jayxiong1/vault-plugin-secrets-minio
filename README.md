@@ -4,6 +4,8 @@ MinIO offers high-performance, S3 compatible object storage. Native to Kubernete
 
 This is a secret engine plugin that combines [HashiCorp Vault](https://www.vaultproject.io/) and [Minio object storage](https://min.io/) server. Vault Minio Plugin can generate dynamic secret credentials used to access oss/minio server and avoid manual generation of credentials. 
 
+Project is also forked from https://github.com/kula/vault-plugin-secrets-minio. Thanks to Thomas L. Kula, providing a base for this project
+
 ## Pre-requisites
 
 1. Install vault, https://developer.hashicorp.com/vault/docs/install 
