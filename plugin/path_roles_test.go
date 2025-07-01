@@ -1,24 +1,24 @@
 package minio_test
 
 import (
-	"context"
-	"fmt"
-	"strconv"
-	"testing"
+    "context"
+    "fmt"
+    "strconv"
+    "testing"
 
-	"github.com/hashicorp/vault/sdk/logical"
-	"github.com/minio/madmin-go/v3"
-	"github.com/stretchr/testify/require"
-	minio "github.com/jayxiong1/vault-plugin-secrets-minio/plugin"
+    "github.com/hashicorp/vault/sdk/logical"
+    "github.com/minio/madmin-go/v3"
+    "github.com/stretchr/testify/require"
+    minio "github.com/jayxiong1/vault-plugin-secrets-minio/plugin"
 )
 
 const (
-    TEST_ROLE_NAME              = "il-fund"
+    TEST_ROLE_NAME              = "test-role-name"
     TEST_USERNAME_PREFIX        = "test-user-name-prefix"
-    TEST_POLICY_NAME            = "dev-us03-investor-vision"
+    TEST_POLICY_NAME            = "test-policy-name"
     TEST_POLICY_DOCUMENT        = "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n   {\n    \"Effect\": \"Allow\",\n    \"Action\": [\n     \"s3:GetBucketLocation\",\n     \"s3:GetObject\"\n    ],\n    \"Resource\": [\n     \"arn:aws:s3:::*\"\n    ]\n   }\n  ]\n }"
     TEST_MAX_STS_TTL            = 100
-    TEST_MAX_TTL                = "30d"
+    TEST_MAX_TTL                = "720h"
     TEST_STATIC_CREDENTIAL_TYPE = "static"
     TEST_STS_CREDENTIAL_TYPE    = "sts"
 )
